@@ -10,7 +10,7 @@ const materialMove = new THREE.LineBasicMaterial({
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderAdapter = new THREE.WebGLRenderer();
-const controls = new THREE.FlyControls(camera, renderAdapter.domElement);
+const controls = new THREE.OrbitControls(camera, renderAdapter.domElement);
 const clock = new THREE.Clock();
 renderAdapter.setSize(window.innerWidth, window.innerHeight);
 
@@ -27,11 +27,6 @@ function renderLoop() {
 function initializeThree() {
     layerLimitSlider = document.getElementById('layerLimit');
     document.body.appendChild(renderAdapter.domElement);
-    
-    controls.movementSpeed = 100;
-    controls.rollSpeed = Math.PI / 6;
-    controls.autoForward = false;
-    controls.dragToLook = true;
 
     camera.position.x = 500;
     camera.position.y = 500;
@@ -48,6 +43,10 @@ class Renderer {
     constructor(model) {
         this.model = model;
         this.sceneObjects = [];
+
+        this.object = new THREE.Group();
+
+        scene.add(this.object);
     }
 
     _pushSceneObject(obj, layer, inScene) {
@@ -58,7 +57,7 @@ class Renderer {
             inScene,
         });
         if (inScene) {
-            scene.add(obj);
+            this.object.add(obj);
         }
         return obj;
     }
@@ -101,12 +100,12 @@ class Renderer {
             }
             if (scObj.layer.z > layerLimitSlider.value) {
                 if (scObj.inScene) {
-                    scene.remove(scObj.obj);
+                    this.object.remove(scObj.obj);
                     scObj.inScene = false;
                 }
             } else {
                 if (!scObj.inScene) {
-                    scene.add(scObj.obj);
+                    this.object.add(scObj.obj);
                     scObj.inScene = true;
                 }
             }
@@ -117,7 +116,7 @@ class Renderer {
         for (const scObj of this.sceneObjects) {
             const obj = scObj.obj;
             if (scObj.inScene) {
-                scene.remove(obj);
+                this.object.remove(obj);
             }
             if (obj.dispose) {
                 obj.dispose();
