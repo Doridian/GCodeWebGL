@@ -49,8 +49,9 @@ class Renderer {
 
         scene.add(this.object);
 
-        layerMinSlider.addEventListener('input', () => this.updateLayerLimit(layerMinSlider));
-        layerMaxSlider.addEventListener('input', () => this.updateLayerLimit(layerMaxSlider));
+        const f = this.updateLayerLimit.bind(this);
+        layerMinSlider.addEventListener('input', f);
+        layerMaxSlider.addEventListener('input', f);
     }
 
     _pushSceneObject(obj, layer, inScene) {
@@ -94,11 +95,11 @@ class Renderer {
         return [vertices[vertices.length - 1], solid];
     }
 
-    updateLayerLimit(changeObj) {
+    updateLayerLimit(evt) {
         let minV = parseFloat(layerMinSlider.value);
         let maxV = parseFloat(layerMaxSlider.value);
         if (maxV < minV) {
-            if (changeObj === layerMaxSlider) {
+            if (evt.target === layerMaxSlider) {
                 layerMinSlider.value = layerMaxSlider.value;
                 minV = maxV;
             } else {
