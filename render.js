@@ -47,6 +47,8 @@ class Renderer {
         this.object = new THREE.Group();
 
         scene.add(this.object);
+
+        layerLimitSlider.addEventListener('input', () => this.updateLayerLimit());
     }
 
     _pushSceneObject(obj, layer, inScene) {
@@ -66,8 +68,6 @@ class Renderer {
         if (vertices.length < 2) {
             return;
         }
-    
-        console.log(`Rendering mesh of ${vertices.length} vertices at layer ${layer.z} with solid ${solid}`);
 
         const geo = this._pushSceneObject(new THREE.BufferGeometry().setFromPoints(vertices), layer, false);
         this._pushSceneObject(new THREE.Line(geo, solid ? materialSolid : materialMove), layer, true);
@@ -93,7 +93,6 @@ class Renderer {
     }
 
     updateLayerLimit() {
-        console.log('Updating scene...');
         for (const scObj of this.sceneObjects) {
             if (!scObj.shouldBeInScene) {
                 continue;
@@ -125,6 +124,9 @@ class Renderer {
         this.sceneObjects = [];
 
         let maxZ = 0;
+        let minDiff = 9999;
+
+        const layerZValues = [];
 
         let init = undefined;
         for (const layer of this.model.layers) {
@@ -132,10 +134,33 @@ class Renderer {
             if (layer.z > maxZ) {
                 maxZ = layer.z;
             }
+            layerZValues.push(layer.z);
         }
 
+        layerZValues.sort((a, b) => a - b);
+        const layerDiffs = new Map();
+        for (let i = 1; i < layerZValues.length; i++) {
+            const curZ = layerZValues[i];
+            const lastZ = layerZValues[i - 1];
+            const zDiff = Math.round((curZ - lastZ) * 100);
+            if (zDiff <= 0) {
+                continue;
+            }
+            layerDiffs.set(zDiff, (layerDiffs.get(zDiff) || 0) + 1);
+        }
+
+        let mostCommonZCount = 0;
+        let mostCommonZ = 0.2;
+        for (const [k,v] of layerDiffs.entries()) {
+            if (v <= mostCommonZCount) {
+                continue;
+            }
+            mostCommonZCount = v;
+            mostCommonZ = k;
+        }
+
+        layerLimitSlider.step = mostCommonZ / 100;
         layerLimitSlider.max = maxZ;
         layerLimitSlider.value = maxZ;
-        layerLimitSlider.addEventListener('input', () => this.updateLayerLimit());
     }
 }
