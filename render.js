@@ -14,7 +14,7 @@ const controls = new THREE.OrbitControls(camera, renderAdapter.domElement);
 const clock = new THREE.Clock();
 renderAdapter.setSize(window.innerWidth, window.innerHeight);
 
-let layerLimitSlider;
+let layerMinSlider, layerMaxSlider;
 
 function renderLoop() {
     requestAnimationFrame(renderLoop);
@@ -25,7 +25,8 @@ function renderLoop() {
 }
 
 function initializeThree() {
-    layerLimitSlider = document.getElementById('layerLimit');
+    layerMinSlider = document.getElementById('layerMin');
+    layerMaxSlider = document.getElementById('layerMax');
     document.body.appendChild(renderAdapter.domElement);
 
     camera.position.x = 500;
@@ -48,7 +49,8 @@ class Renderer {
 
         scene.add(this.object);
 
-        layerLimitSlider.addEventListener('input', () => this.updateLayerLimit());
+        layerMinSlider.addEventListener('input', () => this.updateLayerLimit(layerMinSlider));
+        layerMaxSlider.addEventListener('input', () => this.updateLayerLimit(layerMaxSlider));
     }
 
     _pushSceneObject(obj, layer, inScene) {
@@ -92,12 +94,24 @@ class Renderer {
         return [vertices[vertices.length - 1], solid];
     }
 
-    updateLayerLimit() {
+    updateLayerLimit(changeObj) {
+        let minV = parseFloat(layerMinSlider.value);
+        let maxV = parseFloat(layerMaxSlider.value);
+        if (maxV < minV) {
+            if (changeObj === layerMaxSlider) {
+                layerMinSlider.value = layerMaxSlider.value;
+                minV = maxV;
+            } else {
+                layerMaxSlider.value = layerMinSlider.value;
+                maxV = minV;
+            }
+        }
+
         for (const scObj of this.sceneObjects) {
             if (!scObj.shouldBeInScene) {
                 continue;
             }
-            if (scObj.layer.z > layerLimitSlider.value) {
+            if (scObj.layer.z > maxV || scObj.layer.z < minV) {
                 if (scObj.inScene) {
                     this.object.remove(scObj.obj);
                     scObj.inScene = false;
@@ -123,6 +137,7 @@ class Renderer {
         }
         this.sceneObjects = [];
 
+        let minZ = 9999;
         let maxZ = 0;
         let minDiff = 9999;
 
@@ -133,6 +148,9 @@ class Renderer {
             init = this.renderLayer(layer, init);
             if (layer.z > maxZ) {
                 maxZ = layer.z;
+            }
+            if (layer.z < minZ) {
+                minZ = layer.z;
             }
             layerZValues.push(layer.z);
         }
@@ -159,8 +177,14 @@ class Renderer {
             mostCommonZ = k;
         }
 
-        layerLimitSlider.step = mostCommonZ / 100;
-        layerLimitSlider.max = maxZ;
-        layerLimitSlider.value = maxZ;
+        layerMinSlider.step = mostCommonZ / 100;
+        layerMinSlider.max = maxZ;
+        layerMinSlider.min = minZ;
+        layerMinSlider.value = minZ;
+
+        layerMaxSlider.step = layerMinSlider.step;
+        layerMaxSlider.max = maxZ;
+        layerMaxSlider.min = minZ;
+        layerMaxSlider.value = maxZ;
     }
 }
