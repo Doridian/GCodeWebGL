@@ -1,3 +1,5 @@
+// Taken from https://github.com/mrdoob/three.js/blob/master/examples/js/controls/FlyControls.js
+
 THREE.FlyControls = function ( object, domElement ) {
 
 	if ( domElement === undefined ) {
