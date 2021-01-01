@@ -58,7 +58,7 @@ function parseGCode(data, width) {
                     layers.push(currentLayer);
                 }
                 
-                currentLayer.points.push(new Vector(currentX, currentY, currentE));
+                currentLayer.points.push(new Vector(currentX, currentY, currentZ, currentE));
                 break;
             case 'G28': // Home
             case 'G29': // Autolevel                

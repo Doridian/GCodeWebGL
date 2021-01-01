@@ -1,9 +1,10 @@
 'use strict';
 
 class Vector {
-    constructor(x, y, e) {
+    constructor(x, y, z, e) {
         this.x = x;
         this.y = y;
+        this.z = z;
         this.e = e;
     }
 }

@@ -1,11 +1,18 @@
 'use strict';
 
 const materialSolid = new THREE.LineBasicMaterial({
-	color: 0x00ff00
+	color: 0x00aa00,
 });
 const materialMove = new THREE.LineBasicMaterial({
-	color: 0xff0000
+	color: 0x0000aa,
 });
+const materialSolidCurrent = new THREE.LineBasicMaterial({
+	color: 0x00ffff,
+});
+const materialMoveCurrent = new THREE.LineBasicMaterial({
+	color: 0xff0000,
+});
+
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -36,14 +43,10 @@ function initializeThree() {
     renderLoop();
 }
 
-function pToV(p, layer) {
-    return new THREE.Vector3(p.x, p.y, layer.z);
-}
-
 class Renderer {
     constructor(model) {
         this.model = model;
-        this.sceneObjects = [];
+        this.renderObjects = [];
 
         this.object = new THREE.Group();
 
@@ -54,16 +57,13 @@ class Renderer {
         layerMaxSlider.addEventListener('input', f);
     }
 
-    _pushSceneObject(obj, layer, inScene) {
-        this.sceneObjects.push({
+    _pushSceneObject(obj, layer, canDraw) {
+        this.renderObjects.push({
             obj,
             layer,
-            shouldBeInScene: inScene,
-            inScene,
+            canDraw,
+            inObject: false,
         });
-        if (inScene) {
-            this.object.add(obj);
-        }
         return obj;
     }
 
@@ -79,27 +79,29 @@ class Renderer {
     renderLayer(layer, init) {
         let vertices = init && [init[0]] || [new THREE.Vector3(0,0,0)];
         let solid = init && init[1];
+        let previousE = init && init[2] || 0;
 
         for (const p of layer.points) {
-            const curSolid = p.e > 0;
+            const curSolid = p.e > previousE;
+            previousE = p.e;
             if (solid !== curSolid) {
                 this.renderLayerSegment(vertices, layer, solid);
                 vertices = [vertices[vertices.length - 1]];
                 solid = curSolid;
             }
 
-            vertices.push(pToV(p, layer));
+            vertices.push(new THREE.Vector3(p.x, p.y, p.z));
         }
 
         this.renderLayerSegment(vertices, layer, solid);
-        return [vertices[vertices.length - 1], solid];
+        return [vertices[vertices.length - 1], solid, previousE];
     }
 
     updateLayerLimit(evt) {
         let minV = parseFloat(layerMinSlider.value);
         let maxV = parseFloat(layerMaxSlider.value);
         if (maxV < minV) {
-            if (evt.target === layerMaxSlider) {
+            if (evt && evt.target === layerMaxSlider) {
                 layerMinSlider.value = layerMaxSlider.value;
                 minV = maxV;
             } else {
@@ -107,40 +109,49 @@ class Renderer {
                 maxV = minV;
             }
         }
+        const minDiff = parseFloat(layerMaxSlider.step);
 
-        for (const scObj of this.sceneObjects) {
-            if (!scObj.shouldBeInScene) {
+        for (const rObj of this.renderObjects) {
+            if (!rObj.canDraw) {
                 continue;
             }
-            if (scObj.layer.z > maxV || scObj.layer.z < minV) {
-                if (scObj.inScene) {
-                    this.object.remove(scObj.obj);
-                    scObj.inScene = false;
+            const obj = rObj.obj;
+            if (rObj.layer.z > maxV || rObj.layer.z < minV) {
+                if (rObj.inObject) {
+                    this.object.remove(obj);
+                    rObj.inObject = false;
                 }
             } else {
-                if (!scObj.inScene) {
-                    this.object.add(scObj.obj);
-                    scObj.inScene = true;
+                const isSolid = obj.material === materialSolid || obj.material === materialSolidCurrent;
+                const isCurrent = Math.abs(rObj.layer.z - maxV) < minDiff;
+                if (isSolid) {
+                    obj.material = isCurrent ? materialSolidCurrent : materialSolid;
+                } else {
+                    obj.material = isCurrent ? materialMoveCurrent : materialMove;
+                }
+
+                if (!rObj.inObject) {
+                    this.object.add(obj);
+                    rObj.inObject = true;
                 }
             }
         }
     }
 
     render() {
-        for (const scObj of this.sceneObjects) {
+        for (const scObj of this.renderObjects) {
             const obj = scObj.obj;
-            if (scObj.inScene) {
+            if (scObj.inObject) {
                 this.object.remove(obj);
             }
             if (obj.dispose) {
                 obj.dispose();
             }
         }
-        this.sceneObjects = [];
+        this.renderObjects = [];
 
         let minZ = 9999;
         let maxZ = 0;
-        let minDiff = 9999;
 
         const layerZValues = [];
 
@@ -187,5 +198,7 @@ class Renderer {
         layerMaxSlider.max = maxZ;
         layerMaxSlider.min = minZ;
         layerMaxSlider.value = maxZ;
+
+        this.updateLayerLimit();
     }
 }
