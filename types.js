@@ -1,8 +1,6 @@
 'use strict';
 
 class Vector {
-    // x and y are absolute
-    // e is a delta
     constructor(x, y, e) {
         this.x = x;
         this.y = y;

@@ -1,11 +1,18 @@
 'use strict';
 
 function parseGCode(data, width) {
+    let offsetX = 0;
+    let offsetY = 0;
+    let offsetZ = 0;
+    let offsetE = 0;
+
     let positionRelative = false;
+
     let currentX = 0;
     let currentY = 0;
     let currentZ = 0;
     let currentE = 0;
+
     let currentLayer = new Layer(currentZ);
     const layers = [currentLayer];
 
@@ -18,8 +25,6 @@ function parseGCode(data, width) {
         switch (cmd.code) {
             case 'G0': // Linear move
             case 'G1': // Linear move
-                const lastE = currentE;
-
                 if (positionRelative) {
                     if (cmd.X !== undefined) {
                         currentX += cmd.X;
@@ -35,16 +40,16 @@ function parseGCode(data, width) {
                     }
                 } else {
                     if (cmd.X !== undefined) {
-                        currentX = cmd.X;
+                        currentX = cmd.X + offsetX;
                     }
                     if (cmd.Y !== undefined) {
-                        currentY = cmd.Y;
+                        currentY = cmd.Y + offsetY;
                     }
                     if (cmd.Z !== undefined) {
-                        currentZ = cmd.Z;
+                        currentZ = cmd.Z + offsetZ;
                     }
                     if (cmd.E !== undefined) {
-                        currentE = cmd.E;
+                        currentE = cmd.E + offsetE;
                     }
                 }
 
@@ -53,7 +58,7 @@ function parseGCode(data, width) {
                     layers.push(currentLayer);
                 }
                 
-                currentLayer.points.push(new Vector(currentX, currentY, currentE - lastE));
+                currentLayer.points.push(new Vector(currentX, currentY, currentE));
                 break;
             case 'G28': // Home
             case 'G29': // Autolevel                
@@ -65,11 +70,17 @@ function parseGCode(data, width) {
                 positionRelative = true;
                 break;
             case 'G92': // Set position
-                if (cmd.E) {
-                    currentE = cmd.E;
+                if (cmd.X !== undefined) {
+                    offsetX = currentX - cmd.X;
                 }
-                if (cmd.X || cmd.Y || cmd.Z) {
-                    console.warn(`Got G92 with X or Y or Z. Cannot parse: ${cmdRaw}`);
+                if (cmd.Y !== undefined) {
+                    offsetY = currentY - cmd.Y;
+                }
+                if (cmd.Z !== undefined) {
+                    offsetZ = currentZ - cmd.Z;
+                }
+                if (cmd.E !== undefined) {
+                    offsetE = currentE - cmd.E;
                 }
                 break;
             default:
