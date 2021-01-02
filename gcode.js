@@ -14,7 +14,23 @@ function parseGCode(data, width) {
     let currentE = 0;
 
     let currentLayer = new Layer(currentZ);
-    const layers = [currentLayer];
+    let currentLine = [];
+    let currentLineMaterial = undefined;
+
+    const model = new Model(width);
+    model.add(currentLayer);
+
+    const pushCurrentLine = () => {
+        if (currentLine.length > 1) {
+            currentLayer.add(new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(currentLine),
+                currentLineMaterial,
+            ));
+        }
+
+        currentLineMaterial = undefined;
+        currentLine = [];
+    };
 
     for (const cmdRaw of data.split('\n')) {
         const cmd = new GCode(cmdRaw);
@@ -22,46 +38,81 @@ function parseGCode(data, width) {
             continue;
         }
 
+        const move = new Move(cmd, (currentLayer.moves.length - 1));
+
+        const addLinePoint = (x, y, z, e) => {
+            const startX = currentX;
+            const startY = currentY;
+            const startZ = currentZ;
+            const startE = currentE;
+
+            if (positionRelative) {
+                if (x !== undefined) {
+                    currentX += x;
+                }
+                if (y !== undefined) {
+                    currentY += y;
+                }
+                if (z !== undefined) {
+                    currentZ += z;
+                }
+                if (e !== undefined) {
+                    currentE += e;
+                }
+            } else {
+                if (x !== undefined) {
+                    currentX = x + offsetX;
+                }
+                if (y !== undefined) {
+                    currentY = y + offsetY;
+                }
+                if (z !== undefined) {
+                    currentZ = z + offsetZ;
+                }
+                if (e !== undefined) {
+                    currentE = e + offsetE;
+                }
+            }
+
+            const moveMaterial = (currentE > startE) ? materialSolid : materialMove;
+
+            move.add(new THREE.LineSegments(
+                new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(startX, startY, startZ),
+                    new THREE.Vector3(currentX, currentY, currentZ),
+                ]),
+                moveMaterial,
+            ));
+
+            if (moveMaterial === currentLineMaterial && currentLayer.z === currentZ) {
+                currentLine.push(new THREE.Vector3(currentX, currentY, currentZ));
+            } else {
+                pushCurrentLine();
+                currentLine = [
+                    new THREE.Vector3(startX, startY, startZ),
+                    new THREE.Vector3(currentX, currentY, currentZ),
+                ];
+                currentLineMaterial = moveMaterial;
+            }
+        };
+
         switch (cmd.code) {
             case 'G0': // Linear move
             case 'G1': // Linear move
-                if (positionRelative) {
-                    if (cmd.X !== undefined) {
-                        currentX += cmd.X;
-                    }
-                    if (cmd.Y !== undefined) {
-                        currentY += cmd.Y;
-                    }
-                    if (cmd.Z !== undefined) {
-                        currentZ += cmd.Z;
-                    }
-                    if (cmd.E !== undefined) {
-                        currentE += cmd.E;
-                    }
-                } else {
-                    if (cmd.X !== undefined) {
-                        currentX = cmd.X + offsetX;
-                    }
-                    if (cmd.Y !== undefined) {
-                        currentY = cmd.Y + offsetY;
-                    }
-                    if (cmd.Z !== undefined) {
-                        currentZ = cmd.Z + offsetZ;
-                    }
-                    if (cmd.E !== undefined) {
-                        currentE = cmd.E + offsetE;
-                    }
-                }
-
-                if (currentZ !== currentLayer.z) {
-                    currentLayer = new Layer(currentZ);
-                    layers.push(currentLayer);
-                }
-                
-                currentLayer.points.push(new Vector(currentX, currentY, currentZ, currentE));
+                addLinePoint(cmd.X, cmd.Y, cmd.Z, cmd.E);
+                break;
+            case 'G2': // Arc1
+            case 'G3': // Arc2
+                // TODO: Handle stuff
+                console.warn('Encountered G2/G3 ARC command. Not handled yet!');
                 break;
             case 'G28': // Home
-            case 'G29': // Autolevel                
+            case 'G29': // Autolevel
+                offsetX = 0;
+                offsetY = 0;
+                offsetZ = 0;
+                offsetE = 0;
+                positionRelative = false;
                 break;
             case 'G90': // Absolute mode
                 positionRelative = false;
@@ -88,7 +139,21 @@ function parseGCode(data, width) {
                     console.log(`Unknown G-type command: ${cmdRaw}`);
                 }
         }
+
+        if (move.children.length < 1) {
+            continue;
+        }
+
+        if (currentZ !== currentLayer.z) {
+            move.index = 0;
+            currentLayer = new Layer(currentZ);
+            model.add(currentLayer);
+        }
+
+        currentLayer.moves.push(move);
     }
 
-    return new Model(layers, width);
+    pushCurrentLine();
+
+    return model;
 }
